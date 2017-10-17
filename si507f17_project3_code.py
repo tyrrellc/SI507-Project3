@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import unittest
 import requests
+import csv
 
 #########
 ## Instr note: the outline comments will stay as suggestions, otherwise it's too difficult.
@@ -9,130 +10,173 @@ import requests
 ## NOTE OF ADVICE:
 ## When you go to make your GitHub milestones, think pretty seriously about all the different parts and their requirements, and what you need to understand. Make sure you've asked your questions about Part 2 as much as you need to before Fall Break!
 
+print('\n\n       *********** NEW EXECUTION ***********\n')
 
 ######### PART 0 #########
 
 # Write your code for Part 0 here.
+
+page = requests.get("http://newmantaylor.com/gallery.html")
+print(page.status_code,'\n')
+
+soup = BeautifulSoup(page.content, 'html.parser')
+
+all_imgs = soup.find_all('img')
+for i in all_imgs:
+    print(i.get('alt', "No alt text provided"))
 
 
 ######### PART 1 #########
 
 # Get the main page data...
 
-# Try to get and cache main page data if not yet cached
-# Result of a following try/except block should be that
-# there exists a file nps_gov_data.html,
-# and the html text saved in it is stored in a variable 
-# that the rest of the program can access.
+def Pull_cache(site, file_name, states):
+    try:
+      main_data = open(file_name,'r').read()
+    except:
+      main_data = requests.get(site).text
+      f = open(file_name,'w')
+      f.write(main_data)
+      f.close()
 
-# We've provided comments to guide you through the complex try/except, but if you prefer to build up the code to do this scraping and caching yourself, that is OK.
+    soup = BeautifulSoup(main_data, 'html.parser')
+    menu = soup.find('div', {'class': 'SearchBar-keywordSearch input-group input-group-lg'})
+    state_list = menu.find_all('a', href = lambda href: href and 'state' in href)
 
+    link_list = []
+    for st in states:
+        for item in state_list:
+            text = str(item)
+            find_st = '/'+st+'/'
+            if find_st in text:
+                link_list.append(item)
 
-
-
-
-
-# Get individual states' data...
-
-# Result of a following try/except block should be that
-# there exist 3 files -- arkansas_data.html, california_data.html, michigan_data.html
-# and the HTML-formatted text stored in each one is available
-# in a variable or data structure 
-# that the rest of the program can access.
-
-# TRY: 
-# To open and read all 3 of the files
-
-# But if you can't, EXCEPT:
-
-# Create a BeautifulSoup instance of main page data 
-# Access the unordered list with the states' dropdown
-
-# Get a list of all the li (list elements) from the unordered list, using the BeautifulSoup find_all method
-
-# Use a list comprehension or accumulation to get all of the 'href' attributes of the 'a' tag objects in each li, instead of the full li objects
-
-# Filter the list of relative URLs you just got to include only the 3 you want: AR's, CA's, MI's, using the accumulator pattern & conditional statements
-
-
-# Create 3 URLs to access data from by appending those 3 href values to the main part of the NPS url. Save each URL in a variable.
-
-
-## To figure out what URLs you want to get data from (as if you weren't told initially)...
-# As seen if you debug on the actual site. e.g. Maine parks URL is "http://www.nps.gov/state/me/index.htm", Michigan's is "http://www.nps.gov/state/mi/index.htm" -- so if you compare that to the values in those href attributes you just got... how can you build the full URLs?
-
-
-# Finally, get the HTML data from each of these URLs, and save it in the variables you used in the try clause
-# (Make sure they're the same variables you used in the try clause! Otherwise, all this code will run every time you run the program!)
+    url_list = []
+    for item in link_list:
+        nameU = find_specific(str(item),'>','</')
+        name = nameU.lower()
+        abrev = find_specific(str(item),'state/','/index')
+        try:
+            fname = name+'_data'
+            fname = open(name+'_data.html','r').read()
+            link = 'https://www.nps.gov/state/'+abrev+'/index.htm'
+            url_list.append(link)
+        except:
+            fname = name+'_data'
+            link = 'https://www.nps.gov/state/'+abrev+'/index.htm'
+            url_list.append(link)
+            fname = requests.get(link).text
+            f = open(name+'_data.html','w')
+            f.write(fname)
+            f.close()
+    return url_list
 
 
-# And then, write each set of data to a file so this won't have to run again.
+def find_specific(s, first, last):
+    try:
+        start = s.index( first ) + len( first )
+        end = s.index( last, start )
+        return s[start:end]
+    except ValueError:
+        return ""
 
 
 
-
+#states = ['Arkansas', 'California', 'Michigan']
+states = ['ar', 'ca', 'mi']
+urls = Pull_cache('https://www.nps.gov/index.htm', 'nps_gov_data.html', states)
 
 
 
 ######### PART 2 #########
 
-## Before truly embarking on Part 2, we recommend you do a few things:
-
-# - Create BeautifulSoup objects out of all the data you have access to in variables from Part 1
-# - Do some investigation on those BeautifulSoup objects. What data do you have about each state? How is it organized in HTML?
-
-# HINT: remember the method .prettify() on a BeautifulSoup object -- might be useful for your investigation! So, of course, might be .find or .find_all, etc...
-
-# HINT: Remember that the data you saved is data that includes ALL of the parks/sites/etc in a certain state, but you want the class to represent just ONE park/site/monument/lakeshore.
-
-# We have provided, in sample_html_of_park.html an HTML file that represents the HTML about 1 park. However, your code should rely upon HTML data about Michigan, Arkansas, and Califoria you saved and accessed in Part 1.
-
-# However, to begin your investigation and begin to plan your class definition, you may want to open this file and create a BeautifulSoup instance of it to do investigation on.
-
-# Remember that there are things you'll have to be careful about listed in the instructions -- e.g. if no type of park/site/monument is listed in input, one of your instance variables should have a None value...
-
-
-
-
 
 ## Define your class NationalSite here:
 
+class NationalSite(object):
 
+    def __init__(self, object):
+        if object == None:
+            siteSoup = None
+        else:
+            self.siteSoup = object
+            self.macroInfo = self.siteSoup.find('div', {'id': 'HeroBanner'})
+            self.name = self.macroInfo.find('a', {'class': 'Hero-title'}).get_text()
+            self.location = self.macroInfo.find('span', {'class': 'Hero-location'}).get_text()
 
+            self.type = self.macroInfo.find('span', {'class': 'Hero-designation'}).get_text()
+            if self.type == '':
+                self.type == None
 
+            self.macroDesc = self.siteSoup.find('div', {'class': 'Component text-content-size text-content-style'})
+            self.description = self.macroDesc.find('p').get_text()
 
-## Recommendation: to test the class, at various points, uncomment the following code and invoke some of the methods / check out the instance variables of the test instance saved in the variable sample_inst:
+    def __str__(self):
+        return '{} {} | {}'.format(self.type, self.name, self.location)
 
-# f = open("sample_html_of_park.html",'r')
-# soup_park_inst = BeautifulSoup(f.read(), 'html.parser') # an example of 1 BeautifulSoup instance to pass into your class
-# sample_inst = NationalSite(soup_park_inst)
-# f.close()
+    def get_mailing_address(self):
+        self.macroAdr = self.siteSoup.find('p', {'class': 'adr'}).get_text()
+        badChars = '\n'
+        #self.address = self.macroAdr.strip('','\n')
+        for c in badChars: self.macroAdr = self.macroAdr.replace(c, " ")
+        return '{}'.format(self.macroAdr)
+
+    def contains(self, test_string):
+        #if test_string == type(''):
+        return test_string in self.name
+
 
 
 ######### PART 3 #########
 
 # Create lists of NationalSite objects for each state's parks.
 
-# HINT: Get a Python list of all the HTML BeautifulSoup instances that represent each park, for each state.
+
+def CreateSiteUrl(state):
+    link = 'https://www.nps.gov/state/'+state+'/index.htm'
+    state_data = requests.get(link).text
+    stateSoup = BeautifulSoup(state_data, 'html.parser')
+
+    siteList =[]
+    parks = stateSoup.find('ul', {'id': 'list_parks'})
+    for j in parks:
+        h = j.find('h3')
+        if h == -1:
+            continue
+        else:
+            alink = h.find('a')
+            prelink = alink.get('href')
+            link = prelink.strip('/')
+            siteList.append(link)
+    #print(siteList)
+
+    siteObjectList = []
+    for site in siteList:
+        siteLink = 'https://www.nps.gov/'+site+'/index.htm'
+        #print('siteLink:', siteLink)
+        site_data = requests.get(siteLink).text
+        siteSoup = BeautifulSoup(site_data, 'html.parser')
+        #print('\nsiteSoup:\n\n', siteSoup)
+        siteObject = NationalSite(siteSoup)
+        siteObjectList.append(siteObject)
+
+    return siteObjectList
 
 
+arkansas_natl_sites = CreateSiteUrl('ar')
+california_natl_sites = CreateSiteUrl('ca')
+michigan_natl_sites = CreateSiteUrl('mi')
 
 
-##Code to help you test these out:
-# for p in california_natl_sites:
-# 	print(p)
-# for a in arkansas_natl_sites:
-# 	print(a)
-# for m in michigan_natl_sites:
-# 	print(m)
+#below code uses student example from piazza
+def CreateSiteCSV(siteList, state):
+    with open(state+'.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        for obj in siteList:
+            writer.writerow([obj.name, obj.location, obj.type, obj.get_mailing_address(), obj.description])
+    return
 
 
-
-######### PART 4 #########
-
-## Remember the hints / things you learned from Project 2 about writing CSV files from lists of objects!
-
-## Note that running this step for ALL your data make take a minute or few to run -- so it's a good idea to test any methods/functions you write with just a little bit of data, so running the program will take less time!
-
-## Also remember that IF you have None values that may occur, you might run into some problems and have to debug for where you need to put in some None value / error handling!
-
+CreateSiteCSV(arkansas_natl_sites, 'arkansas')
+CreateSiteCSV(california_natl_sites, 'california')
+CreateSiteCSV(michigan_natl_sites, 'michigan')
