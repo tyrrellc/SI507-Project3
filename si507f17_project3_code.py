@@ -93,35 +93,41 @@ urls = Pull_cache('https://www.nps.gov/index.htm', 'nps_gov_data.html', states)
 
 ## Define your class NationalSite here:
 
+
 class NationalSite(object):
 
     def __init__(self, object):
         if object == None:
-            siteSoup = None
+            macroInfo = None
         else:
-            self.siteSoup = object
-            self.macroInfo = self.siteSoup.find('div', {'id': 'HeroBanner'})
-            self.name = self.macroInfo.find('a', {'class': 'Hero-title'}).get_text()
-            self.location = self.macroInfo.find('span', {'class': 'Hero-location'}).get_text()
-
-            self.type = self.macroInfo.find('span', {'class': 'Hero-designation'}).get_text()
-            if self.type == '':
-                self.type == None
-
-            self.macroDesc = self.siteSoup.find('div', {'class': 'Component text-content-size text-content-style'})
-            self.description = self.macroDesc.find('p').get_text()
+            self.macroInfo = object
+            self.name = self.macroInfo.find('a').get_text()
+            self.location = self.macroInfo.find('h4').get_text()
+            self.type = self.macroInfo.find('h2').get_text()
+            self.description = self.macroInfo.find('p').text
 
     def __str__(self):
         return '{} {} | {}'.format(self.type, self.name, self.location)
 
     def get_mailing_address(self):
-        self.macroAdr = self.siteSoup.find('p', {'class': 'adr'}).get_text()
+
+        holder = self.macroInfo.find('h3')
+        site = holder.find('a')['href']
+        link = 'https://www.nps.gov/'+site+'/index.htm'
+        site_data = requests.get(link).text
+        siteSoup = BeautifulSoup(site_data, 'html.parser')
+
+        self.macroAdr = siteSoup.find('p', {'class': 'adr'}).get_text()
+        badChars = '\n'
+        for c in badChars: self.macroAdr = self.macroAdr.replace(c, " ")
+        return '{}'.format(self.macroAdr)
+
         badChars = '\n'
         #self.address = self.macroAdr.strip('','\n')
         for c in badChars: self.macroAdr = self.macroAdr.replace(c, " ")
         return '{}'.format(self.macroAdr)
 
-    def contains(self, test_string):
+    def __contains__(self, test_string):
         #if test_string == type(''):
         return test_string in self.name
 
@@ -139,25 +145,11 @@ def CreateSiteUrl(state):
 
     siteList =[]
     parks = stateSoup.find('ul', {'id': 'list_parks'})
-    for j in parks:
-        h = j.find('h3')
-        if h == -1:
-            continue
-        else:
-            alink = h.find('a')
-            prelink = alink.get('href')
-            link = prelink.strip('/')
-            siteList.append(link)
-    #print(siteList)
+    siteList = parks.find_all('li', {'class': 'clearfix'})
 
     siteObjectList = []
     for site in siteList:
-        siteLink = 'https://www.nps.gov/'+site+'/index.htm'
-        #print('siteLink:', siteLink)
-        site_data = requests.get(siteLink).text
-        siteSoup = BeautifulSoup(site_data, 'html.parser')
-        #print('\nsiteSoup:\n\n', siteSoup)
-        siteObject = NationalSite(siteSoup)
+        siteObject = NationalSite(site)
         siteObjectList.append(siteObject)
 
     return siteObjectList
